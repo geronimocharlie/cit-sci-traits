@@ -622,7 +622,7 @@ def _single_trait_ranges(
             vgram_kwargs["n_max"] = samples_per_chunk
 
             results = [
-                calculate_variogram_gpu(group, trait_col, **vgram_kwargs)
+                _gpu(group, trait_col, **vgram_kwargs)
                 for _, group in trait_df.groupby("lat_band")
             ]
 

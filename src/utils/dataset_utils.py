@@ -17,6 +17,10 @@ from src.conf.conf import get_config
 from src.conf.environment import log
 from src.utils.raster_utils import open_raster
 
+import logging
+from logging.handlers import RotatingFileHandler
+
+
 cfg = get_config()
 
 
@@ -295,7 +299,7 @@ def get_models_dir(config: ConfigBox = cfg) -> Path:
 
 
 def get_trait_models_dir(trait: str, config: ConfigBox = cfg) -> Path:
-    """Get the path to the models directory for a specific trait and ML architecture."""
+    """Get the path to the models directory for a specific trait and ML architecture."""    
     return get_models_dir(config) / trait / config.train.arch
 
 
@@ -533,6 +537,46 @@ def get_final_fns(config: ConfigBox = cfg) -> Generator[Path, None, None]:
 def get_biome_mapping() -> dict:
     with open("reference/biomes.json") as f:
         return json.load(f)
+
+
+#CHARLIE EXPERIMENT EDIT
+# --- helper function to configure logging into the run folder ---
+def _configure_experiment_logging(run_dir: Path, level: int = logging.INFO) -> None:
+    logs_dir = run_dir / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    log_file = logs_dir / "train.log"
+
+    # basic formatter
+    fmt = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+
+    # file handler (rotating to avoid unbounded files)
+    fh = RotatingFileHandler(str(log_file), maxBytes=10_000_000, backupCount=5)
+    fh.setLevel(level)
+    fh.setFormatter(fmt)
+
+    # get root logger, attach file handler (and keep existing handlers)
+    root_logger = logging.getLogger()
+    root_logger.setLevel(level)
+    # avoid adding duplicate handlers if re-running in same process
+    existing_paths = {getattr(h, "baseFilename", None) for h in root_logger.handlers if hasattr(h, "baseFilename")}
+    if str(log_file) not in existing_paths:
+        root_logger.addHandler(fh)
+
+    # --- add dedicated autogluon file handler so AG prints are captured separately ---
+    ag_logger = logging.getLogger("autogluon")
+    ag_logger.setLevel(level)
+    # attach a separate rotating handler for autogluon messages
+    ag_log_file = logs_dir / "autogluon.log"
+    ag_fh = RotatingFileHandler(str(ag_log_file), maxBytes=20_000_000, backupCount=5)
+    ag_fh.setLevel(level)
+    ag_fh.setFormatter(fmt)
+    # avoid adding the handler multiple times on re-run in same process
+    ag_existing = {getattr(h, "baseFilename", None) for h in ag_logger.handlers if hasattr(h, "baseFilename")}
+    if str(ag_log_file) not in ag_existing:
+        ag_logger.addHandler(ag_fh)
+    # stop double-writing to root handlers (we log autogluon to its own file)
+    ag_logger.propagate = False
+
 
 
 if __name__ == "__main__":

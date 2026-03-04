@@ -8,7 +8,7 @@ the differing keys need to be specified in the product file.
 
 import os
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import yaml
 from box import ConfigBox
@@ -102,7 +102,44 @@ def parse_params() -> Dict[str, Any]:
     return params
 
 
+# module-level cache for a mutable global config object
+_GLOBAL_CFG: Optional[ConfigBox] = None
+
+
+def update_config(overrides: dict) -> None:
+    """
+    Shallow/deep merge overrides into the cached config so subsequent get_config()
+    calls return the merged result.
+    """
+    global _GLOBAL_CFG
+    if _GLOBAL_CFG is None:
+        _GLOBAL_CFG = ConfigBox(parse_params())
+    merged = _deep_merge(_GLOBAL_CFG.to_dict(), overrides)
+    _GLOBAL_CFG = ConfigBox(merged)
+
+
 def get_config(subset: str | None = None) -> ConfigBox:
+    """Return configuration as a ``ConfigBox`` for convenient attribute access.
+
+    Parameters
+    ----------
+    subset: str | None
+        Optional top-level key to return a sub-config.
+
+    Returns
+    -------
+    ConfigBox
+        Full or subset configuration wrapped in ``ConfigBox``.
+    """
+    global _GLOBAL_CFG
+    if _GLOBAL_CFG is None:
+        _GLOBAL_CFG = ConfigBox(parse_params())
+    if subset is not None:
+        return _GLOBAL_CFG[subset]
+    return _GLOBAL_CFG
+
+
+def get_config_old(subset: str | None = None) -> ConfigBox:
     """Return configuration as a ``ConfigBox`` for convenient attribute access.
 
     Parameters

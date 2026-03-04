@@ -31,14 +31,13 @@ from src.utils.training_utils import assign_weights, filter_trait_set
 import logging, io, contextlib
 # enable wandb logging
 import wandb
-from src.utils.wandb_utils import wandb_log_metrics, wandb_log_table, wandb_log_dir_as_artifact, start_live_val_logger
+from src.utils.wandb_utils import wandb_log_metrics, wandb_log_table, wandb_log_dir_as_artifact
 import sys
-import threading
 
 
 
 class Tee:
-    """Write to multiple streams (e.g. terminal + file)."""
+    """Write to multiple streams (terminal + file)."""
     def __init__(self, *streams):
         self.streams = streams
 
@@ -52,13 +51,13 @@ class Tee:
             s.flush()
 
 
-
-
-def _add_autogluon_file_handler(log_path: Path, level: int = logging.INFO) -> logging.FileHandler:
-    """Attach a FileHandler to the 'autogluon' logger writing to log_path.
-    Returns the handler so it can be removed (prevents duplicate logs across folds).
+def _add_autogluon_file_handler(log_path: Path, level=logging.INFO) -> logging.FileHandler:
+    """
+    Ensure autogluon logger writes to log_path.
+    Returns the handler so caller can remove it after fit (important to avoid duplicate logs across folds).
     """
     log_path.parent.mkdir(parents=True, exist_ok=True)
+
     ag_logger = logging.getLogger("autogluon")
     ag_logger.setLevel(level)
     ag_logger.propagate = True
@@ -66,17 +65,18 @@ def _add_autogluon_file_handler(log_path: Path, level: int = logging.INFO) -> lo
     fh = logging.FileHandler(str(log_path), mode="a")
     fh.setLevel(level)
     fh.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
+
     ag_logger.addHandler(fh)
     return fh
 
 
 def _remove_handler_safely(logger_name: str, handler: logging.Handler) -> None:
     try:
-        lg = logging.getLogger(logger_name)
-        lg.removeHandler(handler)
+        logging.getLogger(logger_name).removeHandler(handler)
         handler.close()
     except Exception:
         pass
+
 
 @dataclass
 class TrainOptions:
@@ -175,16 +175,19 @@ class TraitTrainer:
         self.dry_run_text = set_dry_run_text(opts.dry_run)
 
         # CHARLIE EXPERIMENT EDIT
-        # init wandb logging (fold-level + full-model-level)
-        if wandb.run is not None:
-            wandb.define_metric("cv/fold")
-            wandb.define_metric("cv/*", step_metric="cv/fold")
+        # init wandb logging
+        run = wandb.run
+        if run is not None:
+            # Use fold index as the x-axis for fold-level logging
+            wandb.define_metric("inner/fold")
+            wandb.define_metric("inner/*", step_metric="inner/fold")
+            wandb.define_metric("outer/split")
+            wandb.define_metric("outer/*", step_metric="outer/split")
 
             wandb.define_metric("tabm_epoch/step")
             wandb.define_metric("tabm_epoch/val_score", step_metric="tabm_epoch/step")
 
-            wandb.define_metric("full_model/step")    
-            wandb.define_metric("full_model/*", step_metric="full_model/step")
+
 
         if opts.sample < 1.0:
             self._log_subsampling()
@@ -212,7 +215,6 @@ class TraitTrainer:
             )
         #CHARLIE EXPERIMENT EDIT
         # set up detailed autogluon logging to current run path
-        self.current_run.mkdir(parents=True, exist_ok=True)
         _configure_experiment_logging(self.current_run)
 
     def _sample_xy(self) -> pd.DataFrame:
@@ -296,11 +298,12 @@ class TraitTrainer:
     # We set this to avoid a bug in LightGBM when used with GPU.
     # See https://github.com/microsoft/LightGBM/issues/3679
 
-    
     def _train_full_model(self, ts_info: TraitSetInfo):
+
+
         ts_info.full_model.mkdir(parents=True, exist_ok=True)
         ag_log_path = ts_info.full_model / "autogluon.log"
-
+    
         train_full = TabularDataset(
             self.xy.pipe(filter_trait_set, ts_info.trait_set)
             .dropna(subset=[self.trait_name])
@@ -309,89 +312,58 @@ class TraitTrainer:
         )
 
         HYPERPARAMS: dict = {
-            "GBM": {"device": "cpu"},
-            "TABM": {},
-        }
+            "GBM": {
+                "device": "cpu",
+                # "ag_args_fit": {
+                #     "num_gpus": self.opts.cfg.autogluon.num_gpus // 4,
+                #     "num_cpus": self.opts.cfg.autogluon.num_cpus // 4,
+                # },
+            },
+            "TABM": {}}
 
+        #CHARLIE EXPERIMENT EDIT
+        # set up a logger for AutoGluon to capture its output during .fit()
+        ag_logger = logging.getLogger("autogluon")
+        ag_logger.setLevel(logging.INFO)
+
+        #CHARLIE EXPERIMENT EDIT
         fit_kwargs = {
-            "included_model_types": self.opts.cfg.autogluon.included_model_types,
-            "num_gpus": self.opts.cfg.autogluon.num_gpus,
-            "num_cpus": self.opts.cfg.autogluon.num_cpus,
-            "presets": self.opts.cfg.autogluon.presets,
-            "time_limit": self.opts.cfg.autogluon.full_fit_time_limit,
-            "save_bag_folds": self.opts.cfg.autogluon.save_bag_folds,
-            "hyperparameters": HYPERPARAMS,
-            "feature_prune_kwargs": {},
-            "verbosity": self.opts.cfg.autogluon.get("verbosity", 2),
-            "num_bag_folds": self.opts.cfg.autogluon.get("num_bag_folds"),
-            "num_bag_sets": self.opts.cfg.autogluon.get("num_bag_sets"),
-            "num_stack_levels": self.opts.cfg.autogluon.get("num_stack_levels"),
-            "dynamic_stacking": self.opts.cfg.autogluon.get("dynamic_stacking"),
-            "auto_stack": self.opts.cfg.autogluon.get("auto_stack"),
-            "ag_args_fit": self.opts.cfg.autogluon.get("ag_args_fit"),
-            "keep_only_best": self.opts.cfg.autogluon.get("keep_only_best"),
-            "save_space": self.opts.cfg.autogluon.get("save_space"),
-            "refit_full": self.opts.cfg.autogluon.get("refit_full"),
-            "set_best_to_refit_full": self.opts.cfg.autogluon.get("set_best_to_refit_full"),
+        "included_model_types": self.opts.cfg.autogluon.included_model_types,
+        "num_gpus": self.opts.cfg.autogluon.num_gpus,
+        "num_cpus": self.opts.cfg.autogluon.num_cpus,
+        "presets": self.opts.cfg.autogluon.presets,
+        "time_limit": self.opts.cfg.autogluon.full_fit_time_limit,
+        "save_bag_folds": self.opts.cfg.autogluon.save_bag_folds,
+        "hyperparameters": HYPERPARAMS,
+        "feature_prune_kwargs": {},
+        "verbosity": self.opts.cfg.autogluon.get("verbosity", 2),
+        "num_bag_folds": self.opts.cfg.autogluon.get("num_bag_folds"),
+        "num_bag_sets": self.opts.cfg.autogluon.get("num_bag_sets"),
+        "num_stack_levels": self.opts.cfg.autogluon.get("num_stack_levels"),
+        "dynamic_stacking": self.opts.cfg.autogluon.get("dynamic_stacking"),
+        "auto_stack": self.opts.cfg.autogluon.get("auto_stack"),
+        "ag_args_fit": self.opts.cfg.autogluon.get("ag_args_fit"),
+        "keep_only_best": self.opts.cfg.autogluon.get("keep_only_best"),
+        "save_space": self.opts.cfg.autogluon.get("save_space"),
+        "refit_full": self.opts.cfg.autogluon.get("refit_full"),
+        "set_best_to_refit_full": self.opts.cfg.autogluon.get("set_best_to_refit_full"),
         }
+        # remove None entries (AutoGluon will use defaults)
         fit_kwargs = {k: v for k, v in fit_kwargs.items() if v is not None}
 
-        # --- capture ALL AutoGluon output to file while keeping terminal output ---
-        fh = _add_autogluon_file_handler(ag_log_path)
-        try:
-            with ag_log_path.open("a") as f:
-                tee_out = Tee(sys.__stdout__, f)
-                tee_err = Tee(sys.__stderr__, f)
+        # CHARLIE EXPERIMENT EDIT
+        # logging everything from autogluon in file
+        with ag_log_path.open("a") as f:
+            tee_out = Tee(sys.stdout, f)
+            tee_err = Tee(sys.stderr, f)
 
-                with contextlib.redirect_stdout(tee_out), contextlib.redirect_stderr(tee_err):
-                    predictor = TabularPredictor(
-                        label=ts_info.trait_name,
-                        sample_weight="weights",
-                        path=str(ts_info.full_model),
-                    ).fit(train_full, **fit_kwargs)
-        finally:
-            _remove_handler_safely("autogluon", fh)
-
-        # --- W&B: full model metrics + leaderboard + log file upload (consistent keys) ---
-        if wandb.run is not None:
-            meta = {
-                "meta/trait": ts_info.trait_name,
-                "meta/trait_set": ts_info.trait_set,
-            }
-
-            # There is no external holdout here; this is training-set eval only (label clearly).
-            try:
-                full_eval = predictor.evaluate(train_full, auxiliary_metrics=True, detailed_report=True)
-            except Exception:
-                full_eval = {}
-
-            metrics = {"full_model/step": 0, **meta}
-
-            # Use stable keys (same across traits/sets/runs) so W&B charts are clean:
-            for k, v in full_eval.items():
-                if not isinstance(v, (int, float)):
-                    continue
-                if k == "root_mean_squared_error":
-                    metrics["full_model/rmse_train"] = float(v)
-                else:
-                    metrics[f"full_model/{k}_train"] = float(v)
-
-            wandb.log(metrics)
-
-            # Leaderboard table (train_full)
-            try:
-                lb = predictor.leaderboard(train_full, silent=True)
-                lb = lb.assign(trait=ts_info.trait_name, trait_set=ts_info.trait_set)
-                wandb.log({"tables/leaderboard_full_model": wandb.Table(dataframe=lb)})
-            except Exception:
-                pass
-
-            # Upload the log file
-            try:
-                wandb.save(str(ag_log_path), policy="now")
-            except Exception:
-                pass
-
+            with contextlib.redirect_stdout(tee_out), contextlib.redirect_stderr(tee_err):
+                predictor = TabularPredictor(
+                    label=ts_info.trait_name,
+                    sample_weight="weights",
+                    path=str(ts_info.full_model),
+                ).fit(train_full, **fit_kwargs)
+        
         ts_info.mark_full_model_complete()
         predictor.save_space()
 
@@ -437,7 +409,6 @@ class TraitTrainer:
             .reset_index(drop=True)
         )
 
-
         try:
             #CHARLIE EXPERIMENT EDIT
             fit_kwargs = {
@@ -445,7 +416,7 @@ class TraitTrainer:
             "num_gpus": self.opts.cfg.autogluon.num_gpus,
             "num_cpus": self.opts.cfg.autogluon.num_cpus,
             "presets": self.opts.cfg.autogluon.presets,
-            "time_limit": self.opts.cfg.autogluon.cv_fit_time_limit,
+            "time_limit": self.opts.cfg.autogluon.full_fit_time_limit,
             "save_bag_folds": self.opts.cfg.autogluon.save_bag_folds,
             "hyperparameters": HYPERPARAMS,
             "feature_prune_kwargs": {},
@@ -464,44 +435,17 @@ class TraitTrainer:
             # remove None entries (AutoGluon will use defaults)
             fit_kwargs = {k: v for k, v in fit_kwargs.items() if v is not None}
 
-            fh = _add_autogluon_file_handler(ag_log_path)
-            try:
-                # Start live val logging thread (tails autogluon.log)
-                # Start live TabM "(val)" logging -> W&B (epoch axis)
-                stop_event = threading.Event()
-                t = None
-                if wandb.run is not None:
-                   
-                    wandb.log({
-                        "cv/fold": int(fold_id),
-                        "meta/trait": self.trait_name,
-                        "meta/trait_set": trait_set,
-                        "meta/fold": int(fold_id),
-                    })
-                    # Updated helper should log to tabm_epoch/* keys
-                    t = start_live_val_logger(ag_log_path, stop_event=stop_event)
+            with ag_log_path.open("a") as f:
+                tee_out = Tee(sys.stdout, f)
+                tee_err = Tee(sys.stderr, f)
 
-                with ag_log_path.open("a") as f:
-                    # IMPORTANT: use __stdout__/__stderr so terminal stays alive even if W&B redirects sys.stdout
-                    tee_out = Tee(sys.__stdout__, f)
-                    tee_err = Tee(sys.__stderr__, f)
-
-                    with contextlib.redirect_stdout(tee_out), contextlib.redirect_stderr(tee_err):
-                        predictor = TabularPredictor(
-                            label=self.trait_name,
-                            sample_weight="weights",
-                            path=str(fold_model_path),
-                        ).fit(train, **fit_kwargs)
-
-            finally:
-                # stop live logger
-                try:
-                    if t is not None:
-                        stop_event.set()
-                except Exception:
-                    pass
-
-                _remove_handler_safely("autogluon", fh)
+                # capture BOTH prints and tracebacks into the log file (and still show in terminal)
+                with contextlib.redirect_stdout(tee_out), contextlib.redirect_stderr(tee_err):
+                    predictor = TabularPredictor(
+                        label=self.trait_name,
+                        sample_weight="weights",
+                        path=str(fold_model_path),
+                    ).fit(train, **fit_kwargs)
         
             if self.opts.cfg.autogluon.feature_importance:
                 log.info("Calculating feature importance...")
@@ -563,44 +507,27 @@ class TraitTrainer:
             )
 
             #CHARLIE EXPERIMENT EDIT
-
+            # log metrics to wnadb
             run = wandb.run
             if run is not None:
-                # Fold-level CV metrics (fold axis)
-                metrics = {"cv/fold": int(fold_id)}
-
-                # Add metadata once per fold log
-                metrics.update({
-                    "meta/trait": self.trait_name,
-                    "meta/trait_set": trait_set,
-                })
-
+                # numeric metrics only
+                metrics = {}
                 for k, v in eval_results.items():
                     if isinstance(v, (int, float)):
-                        # normalize naming a bit:
-                        if k == "root_mean_squared_error":
-                            metrics["cv/rmse"] = float(v)
-                        elif k == "norm_root_mean_squared_error":
-                            metrics["cv/nrmse"] = float(v)
-                        else:
-                            metrics[f"cv/{k}"] = float(v)
+                        metrics[f"inner/{trait_set}/{self.trait_name}/{k}"] = float(v)
 
+                metrics["inner/fold"] = int(fold_id)
+
+                # nice-to-have: fold metadata for filtering in UI (as summary/config)
                 wandb.log(metrics)
 
-                # Fold leaderboard table
+                # Log leaderboard as a table (on the fold val set)
                 try:
                     lb = predictor.leaderboard(val, silent=True)
                     wandb.log({
-                        f"tables/leaderboard_fold": wandb.Table(dataframe=lb.assign(
-                            trait=self.trait_name, trait_set=trait_set, fold=fold_id
-                        ))
+                        f"inner_leaderboard/{trait_set}/{self.trait_name}/fold_{fold_id}": wandb.Table(dataframe=lb)
                     })
-                except Exception:
-                    pass
-
-                # Upload fold log file
-                try:
-                    wandb.save(str(ag_log_path), policy="now")
+                    wandb.save(str(ag_log_path), policy="live")
                 except Exception:
                     pass
 
@@ -657,24 +584,6 @@ class TraitTrainer:
             ts_info.mark_cv_fold_complete(i)
 
         self._aggregate_cv_results(ts_info.cv_dir, ts_info.training_dir)
-
-        # --- W&B: aggregated CV results ---
-        run = wandb.run
-        if run is not None:
-            eval_path = ts_info.training_dir / self.opts.cfg.train.eval_results
-            if eval_path.exists():
-                try:
-                    # try simple CSV; if multi-index, fallback
-                    try:
-                        agg_df = pd.read_csv(eval_path)
-                    except Exception:
-                        agg_df = pd.read_csv(eval_path, header=[0, 1], index_col=0).reset_index()
-                    wandb.log({
-                        f"inner_cv_agg/{ts_info.trait_set}/{self.trait_name}": wandb.Table(dataframe=agg_df)
-                    })
-                except Exception:
-                    pass
-
         ts_info.mark_cv_complete()
 
     def _train_trait_set(self, trait_set: str) -> None:
@@ -784,12 +693,10 @@ def load_data() -> tuple[dd.DataFrame, pd.DataFrame, dd.DataFrame]:
 
 def train_models(
     trait_sets: Iterable[str] | None = None,
-    label_names: Iterable[str] | None = None,
     sample: float = 1.0,
     debug: bool = False,
     resume: bool = True,
     dry_run: bool = False,
-    labels: list[str] | None = None,
 ) -> None:
     """Train a set of AutoGluon models for each  using the given configuration."""
     dry_run_text = set_dry_run_text(dry_run)
@@ -806,16 +713,7 @@ def train_models(
 
     feats, feats_mask, labels = load_data()
 
-    # CHARLIE EXPERIMENT EDIT
-    # if labels given, filter
-    # else train on all
-    if label_names:
-        label_cols = [col for col in label_names if col in labels.columns]
-    else:
-        label_cols = labels.columns.difference(["x", "y", "source"])
-
-
-    for label_col in label_cols:
+    for label_col in labels.columns.difference(["x", "y", "source"]):
         tmp_xy_path = get_trait_models_dir(label_col) / "tmp" / "xy.parquet"
 
         if not tmp_xy_path.exists() and resume:
