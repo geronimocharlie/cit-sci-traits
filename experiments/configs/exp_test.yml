@@ -1,0 +1,61 @@
+experiment:
+  name: exp_test
+  save_dir: "outputs_charlie/experiments"
+labels:
+  - "X14_mean" # if "all" or None given, train on all available labels
+trait_sets: 
+- "splot_gbif"
+
+
+wandb:
+  enabled: true
+  project: PANOPS
+  entity: geronimocharlie
+  tags: ["test", "TABM"]
+  run_name: "${experiment.name}"   # or hardcode; if your config system doesn’t do interpolation, just set a string
+  log_full_run_dir: false          # set true when you want to upload entire run folder
+
+
+opts:
+  resume: false
+  sample: 0.4 # fraction of dataset
+
+autogluon:
+  # EXPERIMENTAL settings
+
+  included_model_types: [TABM]
+  num_bag_folds: 0
+  num_stack_levels: 0
+  auto_stack: false
+  dynamic_stacking: false
+
+  keep_only_best: false
+
+  ag_args_fit:
+    random_state: 42
+
+  # resources
+  num_cpus: 12
+  num_gpus: 0
+
+  # speed
+  presets: medium
+  full_fit_time_limit: 600   # per outer fold
+  cv_fit_time_limit: 600       # 10min
+
+  # reduce overhead
+  feature_importance: true
+  FI_time_limit: 60
+  FI_num_shuffle_sets: 3
+
+  # reproducibility/debug
+  verbosity: 4
+  refit_full: false
+  set_best_to_refit_full: false
+
+  # disk
+  save_bag_folds: false
+  save_space: true
+
+model_res: "55km" # "1km", "001", "22km", "02", "05", "1", "2"
+PFT: "Shrub_Tree_Grass"

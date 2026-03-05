@@ -1,0 +1,59 @@
+experiment:
+  name: exp_default
+  save_dir: "outputs_charlie/experiments"
+
+opts:
+  resume: true
+  sample: 1.0 # fraction of dataset
+
+labels:
+  - "X14_mean"
+trait_sets: 
+- "splot_gbif"
+
+
+autogluon:
+  # EXPERIMENTAL settings
+
+  included_model_types: [GBM]
+  num_bag_folds: 0
+  num_bag_sets: 0
+  num_stack_levels: 0
+  auto_stack: false
+  dynamic_stacking: false
+
+  # BASE settings
+  keep_only_best: false
+
+  verbosity: 4
+
+  ag_args_fit:
+    random_state: 42
+
+  # resources
+  num_cpus: 8
+  num_gpus: 0
+
+  # speed
+  presets: medium
+  full_fit_time_limit: 1800   # per outer fold
+  cv_fit_time_limit: 3600       # ignore unless your code uses it explicitly
+
+  # feauture importance
+  feature_importance: false    # toggle off for first tier experiments
+  FI_time_limit: 60
+  FI_num_shuffle_sets: 3
+
+  # reproducibility/debug
+  verbosity: 4
+  refit_full: false
+  set_best_to_refit_full: false
+
+  # disk
+  save_bag_folds: false
+  save_space: true
+
+
+
+model_res: "55km" # "1km", "001", "22km", "02", "05", "1", "2"
+PFT: "Shrub_Tree_Grass"
