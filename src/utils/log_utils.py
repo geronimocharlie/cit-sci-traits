@@ -62,20 +62,34 @@ def subprocess_logger(name, level: str | int = "INFO"):
     return logger
 
 
+
 def setup_file_logger(
     logger_name: str = "__main__",
     log_file: str | os.PathLike = "logs/cit-sci-traits.log",
     level: str | int = "INFO",
 ):
     """Setup a file logger."""
-    file_log = logging.getLogger(logger_name)
-    formatter = logging.Formatter("%(asctime)s : %(message)s")
-    file_handler = logging.FileHandler(log_file, mode="a")
-    file_handler.setFormatter(formatter)
+    
+    # Ensure log directory exists
+    log_path = Path(log_file)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
 
-    file_log.setLevel(level)
-    file_log.addHandler(file_handler)
-    return file_log
+    logger = logging.getLogger(logger_name)
+
+    # Avoid duplicate handlers if function is called multiple times
+    if not any(isinstance(h, logging.FileHandler) for h in logger.handlers):
+        formatter = logging.Formatter("%(asctime)s : %(message)s")
+        file_handler = logging.FileHandler(log_path, mode="a")
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+
+    # Convert string level if needed
+    if isinstance(level, str):
+        level = getattr(logging, level.upper())
+
+    logger.setLevel(level)
+
+    return logger
 
 
 def get_loggers_starting_with(s: str) -> list[str]:
