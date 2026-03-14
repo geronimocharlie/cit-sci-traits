@@ -16,6 +16,14 @@ labels:
 trait_sets: 
 - "splot_gbif"
 
+wandb:
+  enabled: true
+  project: PANOPS
+  entity: geronimocharlie
+  tags: ["GBM", "PYLOS", "stacking", "bagging"]
+  run_name: "${experiment.name}"   # or hardcode; if your config system doesn’t do interpolation, just set a string
+  log_full_run_dir: false          # set true when you want to upload entire run folder
+
 
 autogluon:
   # EXPERIMENTAL settings
