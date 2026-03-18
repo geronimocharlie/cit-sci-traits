@@ -7,10 +7,10 @@ opts:
   sample: 1.0 # fraction of dataset
 
 labels:
-  - "X18_mean"     # plant height
+#  - "X18_mean"     # plant height
   - "X4_mean"      # stem specific density
   - "X3113_mean"   # leaf area
-  - "X11_mean"     # SLA
+#  - "X11_mean"     # SLA
   - "X14_mean"     # leaf N (mass)
   - "X26_mean"     # seed mass
 trait_sets: 
@@ -52,7 +52,7 @@ autogluon:
   cv_fit_time_limit: 3600       # ignore unless your code uses it explicitly
 
   # feature importance
-  feature_importance: false # toggle off for first tier experiments
+  feature_importance: null # toggle off for first tier experiments
   FI_time_limit: 60
   FI_num_shuffle_sets: 3
 

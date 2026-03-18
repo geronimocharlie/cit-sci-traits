@@ -2,12 +2,12 @@ experiment:
   name: exp_test
   save_dir: "outputs_charlie/experiments"
 labels:
-  - "X18_mean"     # plant height
+#  - "X18_mean"     # plant height
   - "X4_mean"      # stem specific density
   - "X3113_mean"   # leaf area
-  - "X11_mean"     # SLA
-  - "X14_mean"     # leaf N (mass)
-  - "X26_mean"     # seed mass
+#  - "X11_mean"     # SLA
+#  - "X14_mean"     # leaf N (mass)
+#  - "X26_mean"     # seed mass
 trait_sets: 
 - "splot_gbif"
 
@@ -28,7 +28,7 @@ opts:
 autogluon:
   # EXPERIMENTAL settings
 
-  included_model_types: [TABM]
+  included_model_types: [GBM]
   num_bag_folds: 0
   num_stack_levels: 0
   auto_stack: false
@@ -45,11 +45,11 @@ autogluon:
 
   # speed
   presets: medium
-  full_fit_time_limit: 600   # per outer fold
-  cv_fit_time_limit: 600       # 10min
+  full_fit_time_limit: 60   # per outer fold
+  cv_fit_time_limit: 60       # 10min
 
   # reduce overhead
-  feature_importance: true
+  feature_importance: null
   FI_time_limit: 60
   FI_num_shuffle_sets: 3
 

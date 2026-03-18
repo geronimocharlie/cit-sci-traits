@@ -278,7 +278,7 @@ class TraitTrainer:
         )
 
     @staticmethod
-    def _aggregate_results(cv_dir: Path, target: str) -> pd.DataFrame:
+    def _aggregate_results_original(cv_dir: Path, target: str) -> pd.DataFrame:
         return (
             pd.concat(
                 [
@@ -291,6 +291,28 @@ class TraitTrainer:
             .groupby("index")
             .agg(["mean", "std"])
         )
+    
+    @staticmethod
+    def _aggregate_results(self, cv_dir: Path, target: str | None):
+        if not target:
+            log.info("Feature importance aggregation skipped (no target configured).")
+            return None
+
+        rows = []
+        for fold_model_path in sorted(cv_dir.glob("fold_*")):
+            fp = fold_model_path / target
+            if not fp.exists():
+                log.warning("Feature importance file missing, skipping: %s", fp)
+                continue
+            try:
+                rows.append(pd.read_csv(fp, index_col=0))
+            except Exception as e:
+                log.exception("Failed to read feature importance file %s: %s", fp, e)
+
+        if not rows:
+            log.warning("No feature importance files found under %s for target %s", cv_dir, target)
+            return None
+
 
 
     # We set this to avoid a bug in LightGBM when used with GPU.
