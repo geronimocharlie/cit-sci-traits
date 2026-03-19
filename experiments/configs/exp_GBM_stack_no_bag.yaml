@@ -1,6 +1,6 @@
 experiment:
-  name: exp_default
-  save_dir: "outputs_charlie/experiments"
+  name: exp_GBM_stack_no_bag
+  save_dir: "charlie_experiments"
 
 opts:
   resume: true

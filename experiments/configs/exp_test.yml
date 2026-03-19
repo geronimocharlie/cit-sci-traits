@@ -23,12 +23,12 @@ wandb:
 
 opts:
   resume: false
-  sample: 0.4 # fraction of dataset
+  sample: 1 # fraction of dataset
 
 autogluon:
   # EXPERIMENTAL settings
 
-  included_model_types: [GBM]
+  included_model_types: [TABM]
   num_bag_folds: 0
   num_stack_levels: 0
   auto_stack: false
@@ -40,17 +40,17 @@ autogluon:
     random_state: 42
 
   # resources
-  num_cpus: 12
-  num_gpus: 0
+  num_cpus: 16
+  num_gpus: 1
 
   # speed
   presets: medium
-  full_fit_time_limit: 60   # per outer fold
-  cv_fit_time_limit: 60       # 10min
+  full_fit_time_limit: 10   # per outer fold
+  cv_fit_time_limit: 10       # 10min
 
   # reduce overhead
   feature_importance: null
-  FI_time_limit: 60
+  FI_time_limit: 10
   FI_num_shuffle_sets: 3
 
   # reproducibility/debug

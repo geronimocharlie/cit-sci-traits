@@ -1,6 +1,6 @@
 experiment:
-  name: exp_default
-  save_dir: "outputs_charlie/experiments"
+  name: exp_TABM_no_stack_bag
+  save_dir: "charlie_dexperiments"
 
 
 opts:
