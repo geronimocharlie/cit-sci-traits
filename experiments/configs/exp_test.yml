@@ -50,9 +50,11 @@ autogluon:
   cv_fit_time_limit: 10       # 10min
 
   # reduce overhead
-  feature_importance: null
+  feature_importance: false
+
   FI_time_limit: 10
   FI_num_shuffle_sets: 3
+
 
   # reproducibility/debug
   verbosity: 4
@@ -60,8 +62,8 @@ autogluon:
   set_best_to_refit_full: false
 
   # disk
-  save_bag_folds: false
-  save_space: true
+  save_bag_folds: true
+  save_space: false
 
 model_res: "55km" # "1km", "001", "22km", "02", "05", "1", "2"
 PFT: "Shrub_Tree_Grass"

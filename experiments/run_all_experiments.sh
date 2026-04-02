@@ -19,11 +19,9 @@ mkdir -p logs
 experiments=(
   "exp_GBM_no_stack_no_bag"
   "exp_GBM_no_stack_bag"
-  "exp_GBM_stack_no_bag"
   "exp_GBM_stack_bag"
   "exp_TABM_no_stack_no_bag"
   "exp_TABM_no_stack_bag"
-  "exp_TABM_stack_no_bag"
   "exp_TABM_stack_bag"
 )
 

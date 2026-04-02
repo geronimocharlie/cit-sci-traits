@@ -63,8 +63,8 @@ autogluon:
   set_best_to_refit_full: false
 
   # disk
-  save_bag_folds: false
-  save_space: true
+  save_bag_folds: true
+  save_space: false
 
 
 

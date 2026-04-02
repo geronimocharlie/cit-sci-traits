@@ -36,6 +36,7 @@ import sys
 import threading
 
 
+
 class Tee:
     """Write to multiple streams (e.g. terminal + file)."""
 
@@ -73,6 +74,7 @@ class Tee:
             if hasattr(s, "encoding"):
                 return s.encoding
         return "utf-8"
+
 
 
 
@@ -583,7 +585,11 @@ class TraitTrainer:
 
                 _remove_handler_safely("autogluon", fh)
         
-            if self.opts.cfg.autogluon.feature_importance:
+            fi_enabled = self.opts.cfg.autogluon.get("feature_importance", False)
+            log.info("FI enabled: %r", fi_enabled)
+
+
+            if fi_enabled:
                 log.info("Calculating feature importance...")
                 features = predictor.feature_metadata_in.get_features()
                 feat_ds_map = {
@@ -728,7 +734,10 @@ class TraitTrainer:
 
         log.info("Aggregating feature importance...")
         fi_df = self._aggregate_results(cv_dir, self.opts.cfg.train.feature_importance)
-        fi_df.to_csv(training_dir / self.opts.cfg.train.feature_importance)
+        if fi_df is not None:
+            fi_df.to_csv(training_dir / self.opts.cfg.train.feature_importance)
+        else:
+            log.info("No feature importance results to aggregate.")
 
     def _train_models_cv(self, ts_info: TraitSetInfo) -> None:
         ts_info.cv_dir.mkdir(parents=True, exist_ok=True)

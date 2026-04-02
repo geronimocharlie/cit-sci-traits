@@ -64,9 +64,8 @@ autogluon:
   set_best_to_refit_full: false
 
   # disk
-  save_bag_folds: false
-  save_space: true
-
+  save_bag_folds: true
+  save_space: false
 
 
 model_res: "55km" # "1km", "001", "22km", "02", "05", "1", "2"
