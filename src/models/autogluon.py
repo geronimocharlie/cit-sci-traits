@@ -36,9 +36,9 @@ import sys
 import threading
 
 
-
 class Tee:
     """Write to multiple streams (e.g. terminal + file)."""
+
     def __init__(self, *streams):
         self.streams = streams
 
@@ -46,10 +46,33 @@ class Tee:
         for s in self.streams:
             s.write(data)
             s.flush()
+        return len(data)
 
     def flush(self):
         for s in self.streams:
             s.flush()
+
+    def fileno(self):
+        for s in self.streams:
+            if hasattr(s, "fileno"):
+                return s.fileno()
+        raise OSError("No underlying stream has a file descriptor")
+
+    def isatty(self):
+        for s in self.streams:
+            if hasattr(s, "isatty"):
+                try:
+                    return s.isatty()
+                except Exception:
+                    pass
+        return False
+
+    @property
+    def encoding(self):
+        for s in self.streams:
+            if hasattr(s, "encoding"):
+                return s.encoding
+        return "utf-8"
 
 
 

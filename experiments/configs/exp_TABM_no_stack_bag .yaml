@@ -8,10 +8,10 @@ opts:
   sample: 1.0 # fraction of dataset
 
 labels:
-#  - "X18_mean"     # plant height
+  - "X3106_mean"    # plant height vegetative
   - "X4_mean"      # stem specific density
   - "X3113_mean"   # leaf area
-#  - "X11_mean"     # SLA
+  - "X3117_mean"    # SLA new
   - "X14_mean"     # leaf N (mass)
   - "X26_mean"     # seed mass
 trait_sets: 
@@ -29,7 +29,7 @@ autogluon:
   # EXPERIMENTAL settings
 
   included_model_types: [TABM]
-  num_bag_folds: 3
+  num_bag_folds: 5
   num_bag_sets: 1
   num_stack_levels: 0
   auto_stack: false
