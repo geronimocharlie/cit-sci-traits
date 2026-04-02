@@ -1,6 +1,6 @@
 experiment:
-  name: exp_default
-  save_dir: "outputs_charlie/experiments"
+  name: exp_GBM_no_stack_no_bag
+  save_dir: "charlie_experiments"
 
 opts:
   resume: true
@@ -8,9 +8,9 @@ opts:
 
 labels:
   - "X18_mean"     # plant height
-  - "X4_mean"      # stem specific density
+#  - "X4_mean"      # stem specific density
   - "X3113_mean"   # leaf area
-  - "X11_mean"     # SLA
+#  - "X11_mean"     # SLA
   - "X14_mean"     # leaf N (mass)
   - "X26_mean"     # seed mass
 trait_sets: 

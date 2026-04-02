@@ -200,14 +200,17 @@ class TraitTrainer:
         # CHARLIE EXPERIMENT EDIT
         # init wandb logging (fold-level + full-model-level)
         if wandb.run is not None:
-            wandb.define_metric("cv/fold")
-            wandb.define_metric("cv/*", step_metric="cv/fold")
+            # Define trait-scoped metrics so multiple labels don't overwrite each other
+            trait_prefix = f"{self.trait_name}"
+            wandb.define_metric(f"{trait_prefix}/cv/fold")
+            wandb.define_metric(f"{trait_prefix}/cv/*", step_metric=f"{trait_prefix}/cv/fold")
 
+            # Keep TabM epoch metrics generic (the live logger expects these keys)
             wandb.define_metric("tabm_epoch/step")
             wandb.define_metric("tabm_epoch/val_score", step_metric="tabm_epoch/step")
 
-            wandb.define_metric("full_model/step")    
-            wandb.define_metric("full_model/*", step_metric="full_model/step")
+            wandb.define_metric(f"{trait_prefix}/full_model/step")
+            wandb.define_metric(f"{trait_prefix}/full_model/*", step_metric=f"{trait_prefix}/full_model/step")
 
         if opts.sample < 1.0:
             self._log_subsampling()
@@ -315,27 +318,54 @@ class TraitTrainer:
             .agg(["mean", "std"])
         )
     
-    @staticmethod
     def _aggregate_results(self, cv_dir: Path, target: str | None):
+        """Aggregate per-fold CSV results under `cv_dir` for the given `target` filename.
+
+        Returns a DataFrame (or None) suitable for writing to CSV by callers.
+        This handles both the per-fold evaluation CSVs (which contain a `fold` column)
+        and feature-importance CSVs (which typically use the feature name as the index).
+        """
         if not target:
-            log.info("Feature importance aggregation skipped (no target configured).")
+            log.info("Aggregation skipped (no target configured).")
             return None
 
         rows = []
         for fold_model_path in sorted(cv_dir.glob("fold_*")):
             fp = fold_model_path / target
             if not fp.exists():
-                log.warning("Feature importance file missing, skipping: %s", fp)
+                log.warning("Result file missing, skipping: %s", fp)
                 continue
             try:
                 rows.append(pd.read_csv(fp, index_col=0))
             except Exception as e:
-                log.exception("Failed to read feature importance file %s: %s", fp, e)
+                log.exception("Failed to read result file %s: %s", fp, e)
 
         if not rows:
-            log.warning("No feature importance files found under %s for target %s", cv_dir, target)
+            log.warning("No result files found under %s for target %s", cv_dir, target)
             return None
 
+        # Concatenate all per-fold frames
+        try:
+            concat = pd.concat(rows, axis=0, ignore_index=False)
+        except Exception:
+            concat = pd.concat(rows, axis=0, ignore_index=True)
+
+        # If concatenated frame has a 'fold' column, treat as per-fold eval results
+        if "fold" in concat.columns:
+            # Set fold as index (one row per fold) and return
+            try:
+                result = concat.set_index("fold").sort_index()
+            except Exception:
+                result = concat
+            return result
+
+        # Otherwise assume feature-importance-like data (features as index) and aggregate
+        try:
+            result = concat.groupby(concat.index).agg(["mean", "std"])
+        except Exception:
+            result = concat
+
+        return result
 
 
     # We set this to avoid a bug in LightGBM when used with GPU.
@@ -410,30 +440,34 @@ class TraitTrainer:
             except Exception:
                 full_eval = {}
 
-            metrics = {"full_model/step": 0, **meta}
+            trait_prefix = f"{ts_info.trait_name}"
+            metrics = {f"{trait_prefix}/full_model/step": 0, **meta}
 
-            # Use stable keys (same across traits/sets/runs) so W&B charts are clean:
+            # Use stable keys (namespaced by trait) so W&B charts don't collide across labels
             for k, v in full_eval.items():
                 if not isinstance(v, (int, float)):
                     continue
                 if k == "root_mean_squared_error":
-                    metrics["full_model/rmse_train"] = float(v)
+                    metrics[f"{trait_prefix}/full_model/rmse_train"] = float(v)
                 else:
-                    metrics[f"full_model/{k}_train"] = float(v)
+                    metrics[f"{trait_prefix}/full_model/{k}_train"] = float(v)
 
             wandb.log(metrics)
 
-            # Leaderboard table (train_full)
+            # Leaderboard table (train_full) - log under a single top-level key
             try:
                 lb = predictor.leaderboard(train_full, silent=True)
-                lb = lb.assign(trait=ts_info.trait_name, trait_set=ts_info.trait_set)
-                wandb.log({"tables/leaderboard_full_model": wandb.Table(dataframe=lb)})
+                if lb is not None and not lb.empty:
+                    lb = lb.reset_index()
+                    lb = lb.rename(columns={lb.columns[0]: 'model'})
+                    lb = lb.assign(trait=ts_info.trait_name, trait_set=ts_info.trait_set)
+                    wandb.log({"tables/leaderboard_full_model": wandb.Table(dataframe=lb)})
             except Exception:
-                pass
+                log.exception("Failed to log full-model leaderboard to W&B for %s", ts_info.trait_name)
 
-            # Upload the log file
+            # Upload the log file as a namespaced file attachment
             try:
-                wandb.save(str(ag_log_path), policy="now")
+                wandb.log({f"logs/{ts_info.trait_name}/full_autogluon_log": wandb.File(str(ag_log_path))})
             except Exception:
                 pass
 
@@ -516,9 +550,10 @@ class TraitTrainer:
                 stop_event = threading.Event()
                 t = None
                 if wandb.run is not None:
-                   
+                    # Log a fold-level step for this trait so metrics are namespaced
+                    trait_prefix = f"{self.trait_name}"
                     wandb.log({
-                        "cv/fold": int(fold_id),
+                        f"{trait_prefix}/cv/fold": int(fold_id),
                         "meta/trait": self.trait_name,
                         "meta/trait_set": trait_set,
                         "meta/fold": int(fold_id),
@@ -611,43 +646,47 @@ class TraitTrainer:
 
             run = wandb.run
             if run is not None:
-                # Fold-level CV metrics (fold axis)
-                metrics = {"cv/fold": int(fold_id)}
+                    # Fold-level CV metrics (namespaced by trait to avoid collisions)
+                    trait_prefix = f"{self.trait_name}"
+                    metrics = {f"{trait_prefix}/cv/fold": int(fold_id)}
 
-                # Add metadata once per fold log
-                metrics.update({
-                    "meta/trait": self.trait_name,
-                    "meta/trait_set": trait_set,
-                })
-
-                for k, v in eval_results.items():
-                    if isinstance(v, (int, float)):
-                        # normalize naming a bit:
-                        if k == "root_mean_squared_error":
-                            metrics["cv/rmse"] = float(v)
-                        elif k == "norm_root_mean_squared_error":
-                            metrics["cv/nrmse"] = float(v)
-                        else:
-                            metrics[f"cv/{k}"] = float(v)
-
-                wandb.log(metrics)
-
-                # Fold leaderboard table
-                try:
-                    lb = predictor.leaderboard(val, silent=True)
-                    wandb.log({
-                        f"tables/leaderboard_fold": wandb.Table(dataframe=lb.assign(
-                            trait=self.trait_name, trait_set=trait_set, fold=fold_id
-                        ))
+                    # Add metadata once per fold log
+                    metrics.update({
+                        "meta/trait": self.trait_name,
+                        "meta/trait_set": trait_set,
                     })
-                except Exception:
-                    pass
 
-                # Upload fold log file
-                try:
-                    wandb.save(str(ag_log_path), policy="now")
-                except Exception:
-                    pass
+                    for k, v in eval_results.items():
+                        if isinstance(v, (int, float)):
+                            # normalize naming a bit:
+                            if k == "root_mean_squared_error":
+                                metrics[f"{trait_prefix}/cv/rmse"] = float(v)
+                            elif k == "norm_root_mean_squared_error":
+                                metrics[f"{trait_prefix}/cv/nrmse"] = float(v)
+                            else:
+                                metrics[f"{trait_prefix}/cv/{k}"] = float(v)
+
+                    wandb.log(metrics)
+
+                    # Fold leaderboard table: log under a single top-level key
+                    try:
+                        lb = predictor.leaderboard(val, silent=True)
+                        if lb is not None and not lb.empty:
+                            lb = lb.reset_index()
+                            lb = lb.rename(columns={lb.columns[0]: 'model'})
+                            lb = lb.assign(trait=self.trait_name, trait_set=trait_set, fold=fold_id)
+                            # Log to a single key to keep schema consistent across folds/traits
+                            wandb.log({
+                                "tables/leaderboard_fold": wandb.Table(dataframe=lb)
+                            })
+                    except Exception:
+                        log.exception("Failed to log fold leaderboard to W&B for %s fold %s", self.trait_name, fold_id)
+
+                    # Upload fold log file as a run artifact (namespaced key to avoid overwrite)
+                    try:
+                        wandb.log({f"logs/{self.trait_name}/fold_{fold_id}_autogluon_log": wandb.File(str(ag_log_path))})
+                    except Exception:
+                        pass
 
             pd.DataFrame({col: [val] for col, val in eval_results.items()}).assign(
                 fold=fold_id
@@ -714,11 +753,20 @@ class TraitTrainer:
                         agg_df = pd.read_csv(eval_path)
                     except Exception:
                         agg_df = pd.read_csv(eval_path, header=[0, 1], index_col=0).reset_index()
-                    wandb.log({
-                        f"inner_cv_agg/{ts_info.trait_set}/{self.trait_name}": wandb.Table(dataframe=agg_df)
-                    })
+
+                    # If agg_df is empty, skip logging
+                    if agg_df is None or getattr(agg_df, "empty", True):
+                        log.warning("Aggregated CV results exist but are empty: %s", eval_path)
+                    else:
+                        # Flatten any MultiIndex columns for W&B and ensure a flat index
+                        if isinstance(agg_df.columns, pd.MultiIndex):
+                            agg_df.columns = ["_".join(map(str, c)).strip() for c in agg_df.columns]
+                        agg_df = agg_df.reset_index(drop=True)
+                        wandb.log({
+                            f"inner_cv_agg/{ts_info.trait_set}/{self.trait_name}": wandb.Table(dataframe=agg_df)
+                        })
                 except Exception:
-                    pass
+                    log.exception("Failed to log aggregated CV results to W&B for %s/%s", ts_info.trait_set, self.trait_name)
 
         ts_info.mark_cv_complete()
 
