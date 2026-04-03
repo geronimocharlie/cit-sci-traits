@@ -7,11 +7,15 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 cd "$PROJECT_ROOT" || exit 1
 
-source /home/cl403/miniforge3/bin/activate
-conda activate pylos-env
+# old conda
+#source /home/cl403/miniforge3/bin/activate
+#conda activate pylos-env
+
+# new uv environment
+source .venv/bin/activate
 
 export PROJECT_ROOT
-export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
+export PYTHONPATH="$PROJECT_ROOT:${PYTHONPATH:-}"
 export SYSTEM=local
 
 mkdir -p logs
