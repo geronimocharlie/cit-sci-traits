@@ -388,6 +388,8 @@ class TraitTrainer:
         HYPERPARAMS: dict = {
             "GBM": {"device": "cpu"},
             "TABM": {},
+            "MITRA": {},
+            "REALTABPFN-V2.5": {},
         }
 
         fit_kwargs = {
@@ -490,7 +492,10 @@ class TraitTrainer:
                 #     "num_cpus": self.opts.cfg.autogluon.num_cpus // 4,
                 # },
             },
-            "TABM": {}}
+            "TABM": {},
+            "MITRA": {},
+            "REALTABPFN-V2.5": {},
+        }
 
 
         #CHARLIE EXPERIMENT EDIT
