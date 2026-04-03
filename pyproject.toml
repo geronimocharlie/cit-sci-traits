@@ -1,77 +1,76 @@
-[tool.poetry]
+[project]
 name = "cit-sci-traits"
 version = "0.1.0"
-description = ""
-authors = ["Daniel Lusk <daniel.lusk@geosense.uni-freiburg.de>"]
+description = "Modeling environment for trait prediction experiments"
 readme = "README.md"
-packages = [{include = "src"}]
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "python-dotenv>=1.0.1,<2",
+  "pandas>=2.2.1,<3",
+  "numpy>=1.26.4,<2",
+  "pyyaml>=6.0.1,<7",
+  "pyarrow>=16.0.0,<21",
+  "scikit-learn>=1.4,<1.8",
+  "joblib>=1.4.2,<2",
+  "tqdm>=4.66.4,<5",
+  "python-box~=7.0",
+  "rioxarray>=0.15.1,<1",
+  "rasterio>=1.3.9,<2",
+  "pyogrio>=0.7.2,<1",
+  "geopandas>=0.14.3,<1",
+  "dask[dataframe]>=2024.4.2,<2027",
+  "dask-geopandas>=0.3.1,<1",
+  "h3>=3.7.7,<4",
+  "pykrige>=1.7.1,<2",
+  "utm>=0.7.0,<1",
+  "autogluon-tabular[all]>=1.1.0,<2",
+  "statsmodels>=0.14.2,<1",
+  "tabulate>=0.9.0,<1",
+  "rio-cogeo>=5.3.6,<6",
+  "ease-grid>=0.2,<1",
+  "verstack>=4.1.4,<5",
+  "dvc-ssh>=4.2.1,<5",
+  "dvc-gs>=3.0.2,<4",
+  "wandb>=0.25.0,<1",
+  "ray>=2.52.1,<3"
+]
 
-[tool.poetry.dependencies]
-python = ">3.11.0,<3.12"
-python-dotenv = "^1.0.1"
-ipykernel = "^6.29.3"
-pandas = "^2.2.1"
-rioxarray = "^0.15.1"
-rasterio = "^1.3.9"
-pyogrio = "^0.7.2"
-pyyaml = "^6.0.1"
-numpy = "^1.26.4"
-matplotlib = "^3.8.3"
-ipywidgets = "^8.1.2"
-python-box = "~7"
-seaborn = "^0.13.2"
-cartopy = "^0.23.0"
-geopandas = "^0.14.3"
-pyarrow = "^16.0.0"
-dask-geopandas = "^0.3.1"
-dask = {extras = ["dataframe"], version = "^2024.4.2"}
-joblib = "^1.4.2"
-tqdm = "^4.66.4"
-h3 = "^3.7.7"
-pykrige = "^1.7.1"
-utm = "^0.7.0"
-bokeh = "^3.4.1"
-setuptools = "^69.5.1"
-wheel = "^0.43.0"
-autogluon-tabular = {extras = ["all"], version = "^1.1.0"}
-statsmodels = "^0.14.2"
-tabulate = "^0.9.0"
-scikit-learn = "~1.4"
-rio-cogeo = "^5.3.6"
-ease-grid = "^0.2"
-verstack = "^4.1.4"
+[project.optional-dependencies]
+analysis = [
+  "matplotlib>=3.8.3,<4",
+  "seaborn>=0.13.2,<1",
+  "bokeh>=3.4.1,<4",
+  "cartopy>=0.23.0,<1",
+  "adjusttext>=1.3.0,<2",
+]
 
-[tool.poetry.group.cuda.dependencies]
-cudf-cu11 = { version = "24.10.*", source = "nvidia" }
-cuml-cu11 = { version = "24.10.*", source = "nvidia" }
-cupy-cuda11x = "^13.3.0"
+notebook = [
+  "ipykernel>=6.29.3,<7",
+  "ipywidgets>=8.1.2,<9",
+]
 
-[tool.poetry.group.r.dependencies]
-rpy2 = "^3.5.16"
+dev = [
+  "pre-commit>=3.6.2,<4",
+  "pytest>=8.1.1,<9",
+  "pylint>=3.1.0,<4",
+  "pylint-pytest>=1.1.7,<2",
+  "pytest-mock>=3.12.0,<4",
+  "paramiko>=3.4.0,<4",
+  "earthengine-api>=1.4.5,<2",
+]
 
-[tool.poetry.group.dev.dependencies]
-pre-commit = "^3.6.2"
-pytest = "^8.1.1"
-pylint = "^3.1.0"
-pylint-pytest = "^1.1.7"
-pytest-mock = "^3.12.0"
-paramiko = "^3.4.0"
-earthengine-api = "^1.4.5"
+profiling = [
+  "line_profiler>=4,<5",
+  "scalene>=1.5.51,<2",
+]
 
-[tool.poetry.group.profiling.dependencies]
-line_profiler = "^4"
-scalene = "^1.5.51"
+cuda = [
+  "cupy-cuda11x>=13.3.0,<14",
+]
 
-[tool.poetry.group.analysis.dependencies]
-adjusttext = "^1.3.0"
-
-python-docx = "^1.1.2"
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[[tool.poetry.source]]
-name = "nvidia"
-url = "https://pypi.nvidia.com"
-priority = "supplemental"
-
+[tool.uv]
+package = false
