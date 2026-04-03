@@ -7,12 +7,12 @@ opts:
   sample: 1.0 # fraction of dataset
 
 labels:
-  - "X18_mean"     # plant height
-#  - "X4_mean"      # stem specific density
+  - "X3106_mean"    # plant height vegetative
+  - "X4_mean"      # stem specific density
   - "X3113_mean"   # leaf area
-#  - "X11_mean"     # SLA
+  - "X3117_mean"    # SLA new
   - "X14_mean"     # leaf N (mass)
-  - "X26_mean"     # seed mass
+  - "X26_mean"     # seed ma
 trait_sets: 
 - "splot_gbif"
 
