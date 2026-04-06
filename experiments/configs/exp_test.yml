@@ -16,7 +16,7 @@ wandb:
   enabled: true
   project: PANOPS
   entity: geronimocharlie
-  tags: ["test", "GBM", "local"]
+  tags: ["test", "MITRA", "local"]
   run_name: "${experiment.name}"   # or hardcode; if your config system doesn’t do interpolation, just set a string
   log_full_run_dir: false          # set true when you want to upload entire run folder
 
@@ -28,9 +28,9 @@ opts:
 autogluon:
   # EXPERIMENTAL settings
 
-  included_model_types: [GBM]
-  num_bag_folds: 2
-  num_bag_sets: 1
+  included_model_types: [MITRA]
+  num_bag_folds: 0
+  num_bag_sets: 0
   num_stack_levels: 0
   auto_stack: false
   dynamic_stacking: false
