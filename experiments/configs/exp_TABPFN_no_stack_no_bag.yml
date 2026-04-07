@@ -1,5 +1,5 @@
 experiment:
-  name: exp_TABM_no_stack_no_bag
+  name: exp_TABPFN_no_stack_no_bag
   save_dir: "charlie_experiments"
 
 opts:
@@ -43,7 +43,7 @@ autogluon:
     random_state: 42
 
   # resources
-  num_cpus: 8
+  num_cpus: 16
   num_gpus: 1
 
   # speed
@@ -52,7 +52,7 @@ autogluon:
   cv_fit_time_limit: 3600       # ignore unless your code uses it explicitly
 
   # feauture importance
-  feature_importance: null    # toggle off for first tier experiments
+  feature_importance: false    # toggle off for first tier experiments
   FI_time_limit: 60
   FI_num_shuffle_sets: 3
 

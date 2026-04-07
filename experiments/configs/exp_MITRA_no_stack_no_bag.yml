@@ -1,5 +1,5 @@
 experiment:
-  name: exp_TABM_no_stack_no_bag
+  name: exp_MITRA_no_stack_no_bag
   save_dir: "charlie_experiments"
 
 opts:
@@ -43,7 +43,7 @@ autogluon:
     random_state: 42
 
   # resources
-  num_cpus: 8
+  num_cpus: 16
   num_gpus: 1
 
   # speed

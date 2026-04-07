@@ -3,7 +3,7 @@ experiment:
   save_dir: "charlie_experiments"
 
 opts:
-  resume: true
+  resume: false
   sample: 1.0 # fraction of dataset
 
 labels:
@@ -43,7 +43,7 @@ autogluon:
     random_state: 42
 
   # resources
-  num_cpus: 8
+  num_cpus: 16
   num_gpus: 1
 
   # speed

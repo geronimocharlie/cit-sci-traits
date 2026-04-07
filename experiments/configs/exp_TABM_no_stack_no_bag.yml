@@ -43,7 +43,7 @@ autogluon:
     random_state: 42
 
   # resources
-  num_cpus: 8
+  num_cpus: 16
   num_gpus: 1
 
   # speed

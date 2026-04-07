@@ -4,7 +4,7 @@ experiment:
 
 
 opts:
-  resume: true
+  resume: false
   sample: 1.0 # fraction of dataset
 
 labels:
@@ -45,7 +45,7 @@ autogluon:
     random_state: 42
 
   # resources
-  num_cpus: 8
+  num_cpus: 16
   num_gpus: 0
 
   # speed
@@ -54,7 +54,7 @@ autogluon:
   cv_fit_time_limit: 3600       # ignore unless your code uses it explicitly
 
   # feauture importance
-  feature_importance: null  # toggle off for first tier experiments
+  feature_importance: false  # toggle off for first tier experiments
   FI_time_limit: 60
   FI_num_shuffle_sets: 3
 

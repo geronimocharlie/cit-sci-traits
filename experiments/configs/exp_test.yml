@@ -28,7 +28,7 @@ opts:
 autogluon:
   # EXPERIMENTAL settings
 
-  included_model_types: [MITRA]
+  included_model_types: [REALTABPFN-V2.5]
   num_bag_folds: 0
   num_bag_sets: 0
   num_stack_levels: 0
