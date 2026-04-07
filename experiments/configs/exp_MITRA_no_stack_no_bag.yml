@@ -52,7 +52,7 @@ autogluon:
   cv_fit_time_limit: 3600       # ignore unless your code uses it explicitly
 
   # feauture importance
-  feature_importance: null    # toggle off for first tier experiments
+  feature_importance: false    # toggle off for first tier experiments
   FI_time_limit: 60
   FI_num_shuffle_sets: 3
 
